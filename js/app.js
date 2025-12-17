@@ -12,6 +12,8 @@ import {
   debounce,
   parseBookmarksHtml,
   createBoxFromBookmarks,
+  parseArcJson,
+  createBoxesFromArcSpaces,
 } from './utils.js';
 
 // Application state
@@ -100,32 +102,75 @@ function handleImport(e) {
 
   const reader = new FileReader();
   reader.onload = (event) => {
-    const html = event.target.result;
-    const items = parseBookmarksHtml(html);
+    const content = event.target.result;
+    const isJson = file.name.endsWith('.json');
 
-    if (items.length === 0) {
-      alert('No bookmarks found in the file.');
-      return;
+    if (isJson) {
+      // Handle Arc's StorableSidebar.json format
+      handleArcImport(content);
+    } else {
+      // Handle standard HTML bookmark format
+      handleHtmlImport(content, file.name);
     }
-
-    // Calculate position for the new box
-    const offset = boxes.length * 30;
-    const x = 50 + (offset % 200);
-    const y = 50 + (Math.floor(offset / 200) * 50);
-
-    // Get filename without extension for the box title
-    const title = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
-
-    const newBox = createBoxFromBookmarks(items, title, x, y);
-    boxes.push(newBox);
-    save();
-    render();
   };
 
   reader.readAsText(file);
 
   // Reset file input so the same file can be imported again
   e.target.value = '';
+}
+
+/**
+ * Handle HTML bookmark file import
+ */
+function handleHtmlImport(html, filename) {
+  const items = parseBookmarksHtml(html);
+
+  if (items.length === 0) {
+    alert('No bookmarks found in the file.');
+    return;
+  }
+
+  // Calculate position for the new box
+  const offset = boxes.length * 30;
+  const x = 50 + (offset % 200);
+  const y = 50 + (Math.floor(offset / 200) * 50);
+
+  // Get filename without extension for the box title
+  const title = filename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+
+  const newBox = createBoxFromBookmarks(items, title, x, y);
+  boxes.push(newBox);
+  save();
+  render();
+}
+
+/**
+ * Handle Arc Browser JSON import
+ */
+function handleArcImport(jsonContent) {
+  try {
+    const spaces = parseArcJson(jsonContent);
+
+    if (spaces.length === 0) {
+      alert('No bookmarks found in the Arc data file. Make sure you selected the correct StorableSidebar.json file.');
+      return;
+    }
+
+    // Calculate starting position based on existing boxes
+    const startX = 50 + (boxes.length % 3) * 340;
+    const startY = 50 + Math.floor(boxes.length / 3) * 400;
+
+    const newBoxes = createBoxesFromArcSpaces(spaces, startX, startY);
+    boxes.push(...newBoxes);
+    save();
+    render();
+
+    alert(`Successfully imported ${spaces.length} space(s) from Arc Browser!`);
+  } catch (err) {
+    console.error('Error parsing Arc JSON:', err);
+    alert('Error parsing the file. Make sure you selected a valid Arc StorableSidebar.json file.');
+  }
 }
 
 /**
