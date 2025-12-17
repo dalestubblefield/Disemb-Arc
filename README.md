@@ -1,4 +1,4 @@
-# Arc Like New Tab Page
+# DisembArc
 
 A Chrome extension that replaces the new tab page with a customizable bookmark canvas featuring draggable boxes containing file-tree-style bookmark hierarchies. Inspired by Arc Browser.
 
