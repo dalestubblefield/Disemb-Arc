@@ -33,6 +33,21 @@ A Chrome extension that replaces the new tab page with a customizable bookmark c
 - Click a **bookmark** to open it in a new tab
 - Click the **color dot** in the header to change the box accent color
 - Click the **arrow** to collapse/expand a box
+- Click the **Import** button to import bookmarks from a file
+
+## Importing Bookmarks from Arc Browser
+
+Each Arc Space has its own set of bookmarks. To export bookmarks from a Space:
+
+1. In Arc's address bar, type `arc://bookmarks/` and press Enter
+2. On the Bookmarks page, look for the three dots icon (next to the search box)
+3. Click the three dots and select **Export bookmarks**
+4. Save the HTML file to your computer
+5. Repeat for each Space you want to export
+
+Then import each file using the **Import** button in this extension. Each imported file creates a new box.
+
+> Note: This also works with bookmark exports from Chrome, Firefox, Safari, and other browsers that use the standard HTML bookmark format.
 
 ## License
 
