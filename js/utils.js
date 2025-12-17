@@ -143,3 +143,91 @@ export function removeItemById(items, id) {
 export function insertItemAt(items, item, index) {
   items.splice(index, 0, item);
 }
+
+/**
+ * Parse Netscape bookmark HTML format
+ * Returns an array of items (folders and bookmarks)
+ */
+export function parseBookmarksHtml(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // Find the root DL element
+  const rootDl = doc.querySelector('DL');
+  if (!rootDl) return [];
+
+  return parseDlElement(rootDl);
+}
+
+/**
+ * Parse a DL element and its children
+ */
+function parseDlElement(dl) {
+  const items = [];
+  const children = dl.children;
+
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+
+    if (child.tagName === 'DT') {
+      // Check if it's a folder (H3) or bookmark (A)
+      const h3 = child.querySelector(':scope > H3');
+      const a = child.querySelector(':scope > A');
+
+      if (h3) {
+        // It's a folder
+        const folder = {
+          id: generateId(),
+          type: 'folder',
+          name: h3.textContent.trim(),
+          expanded: true,
+          children: [],
+        };
+
+        // Look for the nested DL (sibling or child)
+        let nestedDl = child.querySelector(':scope > DL');
+        if (!nestedDl) {
+          // Check next sibling
+          const nextSibling = children[i + 1];
+          if (nextSibling && nextSibling.tagName === 'DL') {
+            nestedDl = nextSibling;
+            i++; // Skip the DL in the main loop
+          }
+        }
+
+        if (nestedDl) {
+          folder.children = parseDlElement(nestedDl);
+        }
+
+        items.push(folder);
+      } else if (a) {
+        // It's a bookmark
+        items.push({
+          id: generateId(),
+          type: 'bookmark',
+          name: a.textContent.trim(),
+          url: a.getAttribute('HREF') || '',
+        });
+      }
+    }
+  }
+
+  return items;
+}
+
+/**
+ * Create a box from imported bookmarks
+ */
+export function createBoxFromBookmarks(items, title = 'Imported Bookmarks', x = 100, y = 100) {
+  return {
+    id: generateId(),
+    title,
+    x,
+    y,
+    width: 320,
+    height: 450,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    collapsed: false,
+    items,
+  };
+}
