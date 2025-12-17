@@ -33,7 +33,29 @@ A Chrome extension that replaces the new tab page with a customizable bookmark c
 - Click a **bookmark** to open it in a new tab
 - Click the **color dot** in the header to change the box accent color
 - Click the **arrow** to collapse/expand a box
-- Click the **Import** button to import bookmarks from an HTML file
+- Click the **Import** button to import bookmarks from a file
+
+## Importing from Arc Browser
+
+To import your bookmarks from Arc Browser, you'll need to locate Arc's data file and upload it:
+
+### macOS
+
+1. Open Finder
+2. Press `Cmd + Shift + G` to open "Go to Folder"
+3. Paste this path: `~/Library/Application Support/Arc/`
+4. Find and copy the file `StorableSidebar.json` to a convenient location
+5. Click **Import** in this extension and select the copied file
+6. Each Arc Space will become a separate box
+
+### Windows
+
+1. Open File Explorer
+2. Navigate to: `%LOCALAPPDATA%\Packages\TheBrowserCompany.Arc*\LocalCache\Local\Arc\`
+3. Find and copy the file `StorableSidebar.json` to a convenient location
+4. Click **Import** in this extension and select the copied file
+
+> **Note:** You can also import standard HTML bookmark files exported from Chrome, Firefox, Safari, or other browsers.
 
 ## License
 
