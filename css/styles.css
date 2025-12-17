@@ -1,0 +1,451 @@
+/* CSS Custom Properties for theming */
+:root {
+  /* Light theme (default) */
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e5e5e7;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #86868b;
+  --border-color: #d2d2d7;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-strong: rgba(0, 0, 0, 0.15);
+  --accent-default: #6366f1;
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --selection-bg: rgba(99, 102, 241, 0.15);
+}
+
+/* Dark theme */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #1c1c1e;
+    --bg-secondary: #2c2c2e;
+    --bg-tertiary: #3a3a3c;
+    --text-primary: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --text-muted: #6e6e73;
+    --border-color: #3a3a3c;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --shadow-strong: rgba(0, 0, 0, 0.5);
+    --hover-bg: rgba(255, 255, 255, 0.05);
+    --selection-bg: rgba(99, 102, 241, 0.25);
+  }
+}
+
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Canvas - the main container for boxes */
+#canvas {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: auto;
+}
+
+/* Add box button */
+#add-box-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-default);
+  color: white;
+  font-size: 24px;
+  font-weight: 300;
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--shadow-strong);
+  transition: transform 0.2s, box-shadow 0.2s;
+  z-index: 1000;
+}
+
+#add-box-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px var(--shadow-strong);
+}
+
+#add-box-btn:active {
+  transform: scale(0.95);
+}
+
+/* Box component */
+.box {
+  position: absolute;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--shadow), 0 0 0 1px var(--border-color);
+  min-width: 200px;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.box.dragging {
+  opacity: 0.8;
+  box-shadow: 0 8px 24px var(--shadow-strong);
+  z-index: 1000;
+}
+
+.box.collapsed {
+  height: auto !important;
+  min-height: auto;
+}
+
+.box.collapsed .box-content {
+  display: none;
+}
+
+/* Box header */
+.box-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 8px;
+  cursor: grab;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.box-header:active {
+  cursor: grabbing;
+}
+
+.box-collapse-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.box-collapse-btn:hover {
+  background: var(--hover-bg);
+}
+
+.box-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  min-width: 0;
+}
+
+.box-title:focus {
+  background: var(--bg-tertiary);
+}
+
+.box-color-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.box-color-btn:hover {
+  transform: scale(1.1);
+}
+
+.box-delete-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.box:hover .box-delete-btn {
+  opacity: 1;
+}
+
+.box-delete-btn:hover {
+  background: #ff3b30;
+  color: white;
+}
+
+/* Box content */
+.box-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Box accent bar */
+.box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--box-accent, var(--accent-default));
+  border-radius: 12px 12px 0 0;
+}
+
+/* Resize handles */
+.resize-handle {
+  position: absolute;
+  background: transparent;
+}
+
+.resize-handle-e {
+  right: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resize-handle-s {
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resize-handle-se {
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+}
+
+/* Tree component */
+.tree {
+  list-style: none;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  gap: 6px;
+  transition: background 0.1s;
+}
+
+.tree-item:hover {
+  background: var(--hover-bg);
+}
+
+.tree-item.selected {
+  background: var(--selection-bg);
+}
+
+.tree-item.drag-over {
+  background: var(--selection-bg);
+  outline: 2px dashed var(--accent-default);
+  outline-offset: -2px;
+}
+
+.tree-item-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tree-item-icon.folder {
+  color: var(--box-accent, var(--accent-default));
+}
+
+.tree-item-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 1px 2px;
+  border-radius: 3px;
+  min-width: 0;
+}
+
+.tree-item-name:focus {
+  background: var(--bg-tertiary);
+}
+
+.tree-item-expand {
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.tree-item-expand.expanded {
+  transform: rotate(90deg);
+}
+
+.tree-children {
+  list-style: none;
+  padding-left: 20px;
+}
+
+.tree-children.collapsed {
+  display: none;
+}
+
+/* Add item buttons inside tree */
+.tree-add-btns {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.box-content:hover .tree-add-btns {
+  opacity: 1;
+}
+
+.tree-add-btn {
+  padding: 4px 8px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.tree-add-btn:hover {
+  background: var(--hover-bg);
+  border-color: var(--text-secondary);
+}
+
+/* Color picker popover */
+.color-picker {
+  position: absolute;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 16px var(--shadow-strong);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  z-index: 1001;
+}
+
+.color-picker-option {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.color-picker-option:hover {
+  transform: scale(1.15);
+}
+
+.color-picker-option.selected {
+  border-color: var(--text-primary);
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 40px;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state-text {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.empty-state-hint {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
