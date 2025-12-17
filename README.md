@@ -1,9 +1,18 @@
 # Disemb-Arc
 
-A Chrome extension that replaces the new tab page with a customizable bookmark canvas featuring draggable boxes containing file-tree-style bookmark hierarchies. Inspired by Arc Browser.
+A Chrome extension for Arc Browser users migrating back to Chrome or anyone who wants to bring their Arc Spaces and bookmarks with them.
+
+Import your Arc Browser sidebar directly into Chrome and keep the spatial organization you're used to. Each Arc Space becomes a draggable, customizable box on your new tab page.
+
+## Why Disemb-Arc?
+
+- **Migrating from Arc?** Bring your carefully organized Spaces and bookmarks with you
+- **Using both browsers?** Keep your bookmarks in sync by re-importing periodically
+- **Miss Arc's UI?** Get a similar spatial bookmark experience in Chrome
 
 ## Features
 
+- **Arc import** - Import Arc's StorableSidebar.json directly, each Space becomes a box
 - **Draggable boxes** - Freely position boxes anywhere on the canvas
 - **Resizable boxes** - Drag edges or corners to resize
 - **Collapsible boxes** - Collapse/expand entire boxes
