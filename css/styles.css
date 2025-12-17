@@ -57,11 +57,50 @@ body {
   overflow: auto;
 }
 
-/* Add box button */
-#add-box-btn {
+/* Action buttons container */
+.action-buttons {
   position: fixed;
   bottom: 24px;
   right: 24px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Import button */
+#import-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  border-radius: 24px;
+  border: none;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px var(--shadow), 0 0 0 1px var(--border-color);
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+#import-btn:hover {
+  background: var(--bg-tertiary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow-strong), 0 0 0 1px var(--border-color);
+}
+
+#import-btn:active {
+  transform: translateY(0);
+}
+
+.import-icon {
+  font-size: 14px;
+}
+
+/* Add box button */
+#add-box-btn {
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -73,7 +112,6 @@ body {
   cursor: pointer;
   box-shadow: 0 4px 12px var(--shadow-strong);
   transition: transform 0.2s, box-shadow 0.2s;
-  z-index: 1000;
 }
 
 #add-box-btn:hover {
