@@ -10,6 +10,8 @@ import {
   findParentById,
   removeItemById,
   debounce,
+  parseBookmarksHtml,
+  createBoxFromBookmarks,
 } from './utils.js';
 
 // Application state
@@ -22,6 +24,8 @@ let canvas;
 async function init() {
   canvas = document.getElementById('canvas');
   const addBoxBtn = document.getElementById('add-box-btn');
+  const importBtn = document.getElementById('import-btn');
+  const fileInput = document.getElementById('file-input');
 
   // Load saved data
   const data = await loadData();
@@ -32,6 +36,10 @@ async function init() {
 
   // Setup add box button
   addBoxBtn.addEventListener('click', handleAddBox);
+
+  // Setup import button
+  importBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', handleImport);
 
   // Handle keyboard shortcuts
   document.addEventListener('keydown', handleKeyDown);
@@ -81,6 +89,43 @@ function handleAddBox() {
   boxes.push(newBox);
   save();
   render();
+}
+
+/**
+ * Handle importing bookmarks from file
+ */
+function handleImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const html = event.target.result;
+    const items = parseBookmarksHtml(html);
+
+    if (items.length === 0) {
+      alert('No bookmarks found in the file.');
+      return;
+    }
+
+    // Calculate position for the new box
+    const offset = boxes.length * 30;
+    const x = 50 + (offset % 200);
+    const y = 50 + (Math.floor(offset / 200) * 50);
+
+    // Get filename without extension for the box title
+    const title = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+
+    const newBox = createBoxFromBookmarks(items, title, x, y);
+    boxes.push(newBox);
+    save();
+    render();
+  };
+
+  reader.readAsText(file);
+
+  // Reset file input so the same file can be imported again
+  e.target.value = '';
 }
 
 /**
