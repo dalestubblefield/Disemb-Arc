@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Disemb-Arc",
-  "version": "2025.12.1702",
+  "version": "2025.12.1703",
   "description": "A customizable new tab page with draggable bookmark boxes inspired by Arc Browser",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
