@@ -28,6 +28,9 @@ async function init() {
   const addBoxBtn = document.getElementById('add-box-btn');
   const importBtn = document.getElementById('import-btn');
   const fileInput = document.getElementById('file-input');
+  const helpBtn = document.getElementById('help-btn');
+  const helpModal = document.getElementById('help-modal');
+  const modalClose = document.getElementById('modal-close');
 
   // Load saved data
   const data = await loadData();
@@ -42,6 +45,41 @@ async function init() {
   // Setup import button
   importBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', handleImport);
+
+  // Setup help modal
+  helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+  modalClose.addEventListener('click', () => helpModal.classList.add('hidden'));
+  helpModal.addEventListener('click', (e) => {
+    if (e.target === helpModal) helpModal.classList.add('hidden');
+  });
+
+  // Setup tab switching
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Setup copy buttons
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const path = btn.dataset.path;
+      try {
+        await navigator.clipboard.writeText(path);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    });
+  });
 
   // Handle keyboard shortcuts
   document.addEventListener('keydown', handleKeyDown);
