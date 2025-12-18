@@ -176,40 +176,87 @@ function setupTreeItemDrag(element, item, boxId, handlers) {
     }));
     e.dataTransfer.effectAllowed = 'move';
     element.classList.add('dragging');
+
+    // Store dragging item globally for reference
+    document.body.dataset.draggingId = item.id;
   });
 
   element.addEventListener('dragend', () => {
     element.classList.remove('dragging');
-    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    document.querySelectorAll('.drag-over, .drag-above, .drag-below').forEach(el => {
+      el.classList.remove('drag-over', 'drag-above', 'drag-below');
+    });
+    delete document.body.dataset.draggingId;
   });
 
-  // Allow dropping on folders
-  if (item.type === 'folder') {
-    element.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      element.classList.add('drag-over');
-    });
+  // Allow dropping on all items for reordering
+  element.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
 
-    element.addEventListener('dragleave', () => {
-      element.classList.remove('drag-over');
-    });
+    // Don't allow dropping on self
+    if (document.body.dataset.draggingId === item.id) return;
 
-    element.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      element.classList.remove('drag-over');
+    // Determine drop position based on mouse location
+    const rect = element.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
 
-      try {
-        const data = JSON.parse(e.dataTransfer.getData('application/json'));
-        if (data.itemId !== item.id) {
-          handlers.onMoveItem(data.sourceBoxId, data.itemId, boxId, item.id);
-        }
-      } catch (err) {
-        console.error('Drop error:', err);
+    // Clear previous indicators
+    element.classList.remove('drag-over', 'drag-above', 'drag-below');
+
+    if (item.type === 'folder') {
+      // For folders: top third = above, middle third = into, bottom third = below
+      const thirdHeight = rect.height / 3;
+      if (e.clientY < rect.top + thirdHeight) {
+        element.classList.add('drag-above');
+      } else if (e.clientY > rect.bottom - thirdHeight) {
+        element.classList.add('drag-below');
+      } else {
+        element.classList.add('drag-over');
       }
-    });
-  }
+    } else {
+      // For bookmarks: top half = above, bottom half = below
+      if (e.clientY < midY) {
+        element.classList.add('drag-above');
+      } else {
+        element.classList.add('drag-below');
+      }
+    }
+  });
+
+  element.addEventListener('dragleave', (e) => {
+    // Only remove if actually leaving the element
+    if (!element.contains(e.relatedTarget)) {
+      element.classList.remove('drag-over', 'drag-above', 'drag-below');
+    }
+  });
+
+  element.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const wasAbove = element.classList.contains('drag-above');
+    const wasBelow = element.classList.contains('drag-below');
+    const wasInto = element.classList.contains('drag-over');
+
+    element.classList.remove('drag-over', 'drag-above', 'drag-below');
+
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      if (data.itemId === item.id) return;
+
+      if (wasInto && item.type === 'folder') {
+        // Drop into folder
+        handlers.onMoveItem(data.sourceBoxId, data.itemId, boxId, item.id);
+      } else if (wasAbove || wasBelow) {
+        // Drop before or after this item (reorder)
+        handlers.onReorderItem(data.sourceBoxId, data.itemId, boxId, item.id, wasBelow ? 'after' : 'before');
+      }
+    } catch (err) {
+      console.error('Drop error:', err);
+    }
+  });
 }
 
 /**
@@ -267,6 +314,14 @@ function showContextMenu(x, y, item, boxId, handlers) {
     });
     return btn;
   };
+
+  // Rename option for all items
+  menu.appendChild(createMenuItem('Rename', () => {
+    const newName = prompt('Enter new name:', item.name);
+    if (newName !== null && newName.trim() !== '') {
+      handlers.onItemNameChange(boxId, item.id, newName.trim());
+    }
+  }));
 
   if (item.type === 'folder') {
     menu.appendChild(createMenuItem('Add Folder', () => {
