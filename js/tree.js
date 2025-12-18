@@ -51,10 +51,34 @@ function renderTreeItem(item, boxId, accentColor, handlers, index) {
   }
 
   // Icon
-  const icon = document.createElement('span');
-  icon.className = 'tree-item-icon' + (item.type === 'folder' ? ' folder' : '');
-  icon.innerHTML = item.type === 'folder' ? '&#128193;' : '&#128279;';
-  row.appendChild(icon);
+  if (item.type === 'folder') {
+    const icon = document.createElement('span');
+    icon.className = 'tree-item-icon folder';
+    icon.innerHTML = '&#128193;';
+    row.appendChild(icon);
+  } else {
+    // Favicon for bookmarks
+    const favicon = document.createElement('img');
+    favicon.className = 'tree-item-favicon';
+    favicon.width = 16;
+    favicon.height = 16;
+    favicon.loading = 'lazy';
+    try {
+      const url = new URL(item.url);
+      favicon.src = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
+    } catch {
+      favicon.src = 'https://www.google.com/s2/favicons?domain=example.com&sz=32';
+    }
+    favicon.onerror = () => {
+      // Fallback to a default icon on error
+      favicon.style.display = 'none';
+      const fallback = document.createElement('span');
+      fallback.className = 'tree-item-icon';
+      fallback.innerHTML = '&#128279;';
+      favicon.parentNode.insertBefore(fallback, favicon);
+    };
+    row.appendChild(favicon);
+  }
 
   // Name input
   const nameInput = document.createElement('input');
@@ -95,6 +119,17 @@ function renderTreeItem(item, boxId, accentColor, handlers, index) {
       if (e.target !== nameInput || nameInput.readOnly) {
         window.open(item.url, '_blank');
       }
+    });
+  }
+
+  // Click to expand/collapse folder
+  if (item.type === 'folder') {
+    row.addEventListener('click', (e) => {
+      // Don't toggle if clicking on the name input while editing
+      if (e.target === nameInput && !nameInput.readOnly) {
+        return;
+      }
+      handlers.onToggleExpand(boxId, item.id);
     });
   }
 
