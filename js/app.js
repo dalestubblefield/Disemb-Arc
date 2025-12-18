@@ -238,6 +238,20 @@ function findBox(boxId) {
 }
 
 /**
+ * Recursively set expanded state on all folders
+ */
+function setAllFoldersExpanded(items, expanded) {
+  for (const item of items) {
+    if (item.type === 'folder') {
+      item.expanded = expanded;
+      if (item.children && item.children.length > 0) {
+        setAllFoldersExpanded(item.children, expanded);
+      }
+    }
+  }
+}
+
+/**
  * Event handlers passed to components
  */
 const handlers = {
@@ -281,6 +295,24 @@ const handlers = {
     const box = findBox(boxId);
     if (box) {
       box.collapsed = !box.collapsed;
+      save();
+      render();
+    }
+  },
+
+  onExpandAllFolders(boxId) {
+    const box = findBox(boxId);
+    if (box) {
+      setAllFoldersExpanded(box.items, true);
+      save();
+      render();
+    }
+  },
+
+  onCollapseAllFolders(boxId) {
+    const box = findBox(boxId);
+    if (box) {
+      setAllFoldersExpanded(box.items, false);
       save();
       render();
     }
