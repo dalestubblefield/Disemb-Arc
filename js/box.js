@@ -76,11 +76,7 @@ export function renderBox(box, handlers) {
   const content = document.createElement('div');
   content.className = 'box-content';
 
-  // Render tree
-  const tree = renderTree(box.items, box.id, box.color, handlers);
-  content.appendChild(tree);
-
-  // Add item buttons
+  // Add item buttons (at top)
   const addBtns = document.createElement('div');
   addBtns.className = 'tree-add-btns';
 
@@ -98,9 +94,32 @@ export function renderBox(box, handlers) {
     handlers.onAddBookmark(box.id, null);
   });
 
+  // Expand/Collapse all buttons
+  const expandAllBtn = document.createElement('button');
+  expandAllBtn.className = 'tree-add-btn tree-toggle-btn';
+  expandAllBtn.textContent = 'Expand All';
+  expandAllBtn.title = 'Expand all folders';
+  expandAllBtn.addEventListener('click', () => {
+    handlers.onExpandAllFolders(box.id);
+  });
+
+  const collapseAllBtn = document.createElement('button');
+  collapseAllBtn.className = 'tree-add-btn tree-toggle-btn';
+  collapseAllBtn.textContent = 'Collapse All';
+  collapseAllBtn.title = 'Collapse all folders';
+  collapseAllBtn.addEventListener('click', () => {
+    handlers.onCollapseAllFolders(box.id);
+  });
+
   addBtns.appendChild(addFolderBtn);
   addBtns.appendChild(addBookmarkBtn);
+  addBtns.appendChild(expandAllBtn);
+  addBtns.appendChild(collapseAllBtn);
   content.appendChild(addBtns);
+
+  // Render tree
+  const tree = renderTree(box.items, box.id, box.color, handlers);
+  content.appendChild(tree);
 
   // Resize handles
   const resizeE = document.createElement('div');
