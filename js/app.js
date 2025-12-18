@@ -1,6 +1,6 @@
 // Main application entry point
 
-import { loadData, saveBoxes } from './storage.js';
+import { loadData, saveBoxes, saveExpandedSpaceId } from './storage.js';
 import { renderBox } from './box.js';
 import {
   createEmptyBox,
@@ -18,6 +18,7 @@ import {
 
 // Application state
 let boxes = [];
+let expandedSpaceId = null;
 let canvas;
 
 /**
@@ -35,6 +36,7 @@ async function init() {
   // Load saved data
   const data = await loadData();
   boxes = data.boxes || [];
+  expandedSpaceId = data.expandedSpaceId || (boxes.length > 0 ? boxes[0].id : null);
 
   // Render initial state
   render();
@@ -97,7 +99,8 @@ function render() {
   }
 
   boxes.forEach((box) => {
-    const boxEl = renderBox(box, handlers);
+    const isExpanded = box.id === expandedSpaceId;
+    const boxEl = renderBox(box, handlers, isExpanded);
     canvas.appendChild(boxEl);
   });
 }
@@ -120,13 +123,10 @@ function renderEmptyState() {
  * Handle adding a new box
  */
 function handleAddBox() {
-  // Calculate position to avoid overlap
-  const offset = boxes.length * 30;
-  const x = 50 + (offset % 200);
-  const y = 50 + (Math.floor(offset / 200) * 50);
-
-  const newBox = createEmptyBox(x, y);
+  const newBox = createEmptyBox();
   boxes.push(newBox);
+  expandedSpaceId = newBox.id; // Expand the newly created box
+  saveExpandedSpaceId(expandedSpaceId);
   save();
   render();
 }
@@ -169,16 +169,13 @@ function handleHtmlImport(html, filename) {
     return;
   }
 
-  // Calculate position for the new box
-  const offset = boxes.length * 30;
-  const x = 50 + (offset % 200);
-  const y = 50 + (Math.floor(offset / 200) * 50);
-
   // Get filename without extension for the box title
   const title = filename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
 
-  const newBox = createBoxFromBookmarks(items, title, x, y);
+  const newBox = createBoxFromBookmarks(items, title);
   boxes.push(newBox);
+  expandedSpaceId = newBox.id; // Expand the imported box
+  saveExpandedSpaceId(expandedSpaceId);
   save();
   render();
 }
@@ -195,12 +192,13 @@ function handleArcImport(jsonContent) {
       return;
     }
 
-    // Calculate starting position based on existing boxes
-    const startX = 50 + (boxes.length % 3) * 340;
-    const startY = 50 + Math.floor(boxes.length / 3) * 400;
-
-    const newBoxes = createBoxesFromArcSpaces(spaces, startX, startY);
+    const newBoxes = createBoxesFromArcSpaces(spaces);
     boxes.push(...newBoxes);
+    // Expand the first imported space
+    if (newBoxes.length > 0) {
+      expandedSpaceId = newBoxes[0].id;
+      saveExpandedSpaceId(expandedSpaceId);
+    }
     save();
     render();
 
@@ -255,25 +253,14 @@ function setAllFoldersExpanded(items, expanded) {
  * Event handlers passed to components
  */
 const handlers = {
+  // Accordion handlers
+  onSelectSpace(boxId) {
+    expandedSpaceId = boxId;
+    saveExpandedSpaceId(boxId);
+    render();
+  },
+
   // Box handlers
-  onPositionChange(boxId, x, y) {
-    const box = findBox(boxId);
-    if (box) {
-      box.x = x;
-      box.y = y;
-      save();
-    }
-  },
-
-  onSizeChange(boxId, width, height) {
-    const box = findBox(boxId);
-    if (box) {
-      box.width = width;
-      box.height = height;
-      save();
-    }
-  },
-
   onTitleChange(boxId, title) {
     const box = findBox(boxId);
     if (box) {
@@ -286,15 +273,6 @@ const handlers = {
     const box = findBox(boxId);
     if (box) {
       box.color = color;
-      save();
-      render();
-    }
-  },
-
-  onToggleCollapse(boxId) {
-    const box = findBox(boxId);
-    if (box) {
-      box.collapsed = !box.collapsed;
       save();
       render();
     }
@@ -320,6 +298,11 @@ const handlers = {
 
   onDelete(boxId) {
     boxes = boxes.filter((b) => b.id !== boxId);
+    // If the deleted box was expanded, expand the first remaining box
+    if (expandedSpaceId === boxId) {
+      expandedSpaceId = boxes.length > 0 ? boxes[0].id : null;
+      saveExpandedSpaceId(expandedSpaceId);
+    }
     save();
     render();
   },
