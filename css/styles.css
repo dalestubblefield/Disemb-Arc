@@ -93,13 +93,133 @@ body {
   color: var(--text-primary);
 }
 
-/* Canvas - the main container for boxes */
+/* Canvas - horizontal accordion container */
 #canvas {
-  position: relative;
+  display: flex;
+  flex-direction: row;
   width: 100vw;
-  height: 100vh;
-  overflow: auto;
-  padding-top: 60px;
+  height: calc(100vh - 60px);
+  margin-top: 60px;
+  overflow: hidden;
+}
+
+/* Accordion panel - each space */
+.accordion-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid color-mix(in srgb, var(--box-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--box-accent) 10%, var(--bg-secondary));
+  transition: flex 0.3s ease, min-width 0.3s ease;
+  overflow: hidden;
+}
+
+.accordion-panel:last-child {
+  border-right: none;
+}
+
+.accordion-panel.collapsed {
+  flex: 0 0 48px;
+  min-width: 48px;
+  max-width: 48px;
+  cursor: pointer;
+}
+
+.accordion-panel.collapsed:hover {
+  background: color-mix(in srgb, var(--box-accent) 20%, var(--bg-secondary));
+}
+
+.accordion-panel.expanded {
+  flex: 0 0 400px;
+  max-width: 400px;
+}
+
+/* Accordion header */
+.accordion-header {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--box-accent) 25%, transparent);
+  flex-shrink: 0;
+}
+
+.accordion-panel.collapsed .accordion-header {
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 8px;
+  border-bottom: none;
+}
+
+/* Vertical title for collapsed panels */
+.accordion-title-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Horizontal title for expanded panel */
+.accordion-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  min-width: 0;
+}
+
+.accordion-title:focus {
+  background: var(--bg-tertiary);
+}
+
+/* Color indicator dot */
+.accordion-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 2px solid var(--bg-tertiary);
+}
+
+.accordion-panel.collapsed .accordion-color-dot {
+  margin-bottom: 8px;
+}
+
+.accordion-color-dot:hover {
+  transform: scale(1.1);
+}
+
+/* Accordion content area */
+.accordion-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Accent bar at top of panel */
+.accordion-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--box-accent, var(--accent-default));
+}
+
+.accordion-panel {
+  position: relative;
 }
 
 /* Action buttons container */
@@ -168,86 +288,7 @@ body {
   transform: scale(0.95);
 }
 
-/* Box component */
-.box {
-  position: absolute;
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px var(--shadow), 0 0 0 1px var(--border-color);
-  min-width: 200px;
-  min-height: 100px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.box.dragging {
-  opacity: 0.8;
-  box-shadow: 0 8px 24px var(--shadow-strong);
-  z-index: 1000;
-}
-
-.box.collapsed {
-  height: auto !important;
-  min-height: auto;
-}
-
-.box.collapsed .box-content {
-  display: none;
-}
-
-/* Box header */
-.box-header {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  gap: 8px;
-  cursor: grab;
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-}
-
-.box-header:active {
-  cursor: grabbing;
-}
-
-.box-collapse-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  font-size: 12px;
-  transition: background 0.15s;
-  flex-shrink: 0;
-}
-
-.box-collapse-btn:hover {
-  background: var(--hover-bg);
-}
-
-.box-title {
-  flex: 1;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--text-primary);
-  background: transparent;
-  border: none;
-  outline: none;
-  padding: 2px 4px;
-  border-radius: 4px;
-  min-width: 0;
-}
-
-.box-title:focus {
-  background: var(--bg-tertiary);
-}
-
+/* Color and delete buttons (used in accordion header) */
 .box-color-btn {
   width: 16px;
   height: 16px;
@@ -278,62 +319,13 @@ body {
   flex-shrink: 0;
 }
 
-.box:hover .box-delete-btn {
+.accordion-header:hover .box-delete-btn {
   opacity: 1;
 }
 
 .box-delete-btn:hover {
   background: #ff3b30;
   color: white;
-}
-
-/* Box content */
-.box-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-/* Box accent bar */
-.box::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--box-accent, var(--accent-default));
-  border-radius: 12px 12px 0 0;
-}
-
-/* Resize handles */
-.resize-handle {
-  position: absolute;
-  background: transparent;
-}
-
-.resize-handle-e {
-  right: 0;
-  top: 12px;
-  bottom: 12px;
-  width: 8px;
-  cursor: ew-resize;
-}
-
-.resize-handle-s {
-  bottom: 0;
-  left: 12px;
-  right: 12px;
-  height: 8px;
-  cursor: ns-resize;
-}
-
-.resize-handle-se {
-  right: 0;
-  bottom: 0;
-  width: 16px;
-  height: 16px;
-  cursor: nwse-resize;
 }
 
 /* Tree component */
@@ -445,7 +437,7 @@ body {
   transition: opacity 0.15s;
 }
 
-.box-content:hover .tree-add-btns {
+.accordion-content:hover .tree-add-btns {
   opacity: 1;
 }
 
