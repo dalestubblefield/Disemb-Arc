@@ -44,9 +44,15 @@ function renderCollapsedPanel(el, box, handlers) {
   el.appendChild(header);
 
   // Click to expand
-  el.addEventListener('click', () => {
-    handlers.onSelectSpace(box.id);
+  el.addEventListener('click', (e) => {
+    // Don't expand if this was a drop
+    if (!el.classList.contains('drag-over')) {
+      handlers.onSelectSpace(box.id);
+    }
   });
+
+  // Setup drop zone for cross-space moves
+  setupPanelDropZone(el, box, handlers);
 }
 
 /**
@@ -186,4 +192,35 @@ function showColorPicker(anchorEl, currentColor, onSelect) {
     }
   };
   setTimeout(() => document.addEventListener('click', closeHandler), 0);
+}
+
+/**
+ * Setup drop zone on accordion panel for cross-space moves
+ */
+function setupPanelDropZone(el, box, handlers) {
+  el.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    el.classList.add('drag-over');
+  });
+
+  el.addEventListener('dragleave', (e) => {
+    // Only remove if actually leaving the panel
+    if (!el.contains(e.relatedTarget)) {
+      el.classList.remove('drag-over');
+    }
+  });
+
+  el.addEventListener('drop', (e) => {
+    e.preventDefault();
+    el.classList.remove('drag-over');
+
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      // Move item to this space (root level)
+      handlers.onMoveItem(data.sourceBoxId, data.itemId, box.id, null);
+    } catch (err) {
+      console.error('Drop error:', err);
+    }
+  });
 }
