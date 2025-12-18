@@ -14,6 +14,7 @@ import {
   createBoxFromBookmarks,
   parseArcJson,
   createBoxesFromArcSpaces,
+  mergeArcSpaces,
   generateId,
 } from './utils.js';
 import {
@@ -213,16 +214,29 @@ function handleArcImport(jsonContent) {
     }
 
     const newBoxes = createBoxesFromArcSpaces(spaces);
-    boxes.push(...newBoxes);
-    // Expand the first imported space
-    if (newBoxes.length > 0) {
-      expandedSpaceId = newBoxes[0].id;
+    const previousCount = boxes.length;
+
+    // Merge with existing boxes, avoiding duplicates
+    boxes = mergeArcSpaces(boxes, newBoxes);
+
+    const addedCount = boxes.length - previousCount;
+    const updatedCount = spaces.length - addedCount;
+
+    // Expand the first imported space if nothing was expanded
+    if (!expandedSpaceId && boxes.length > 0) {
+      expandedSpaceId = boxes[0].id;
       saveExpandedSpaceId(expandedSpaceId);
     }
     save();
     render();
 
-    alert(`Successfully imported ${spaces.length} space(s) from Arc Browser!`);
+    if (addedCount > 0 && updatedCount > 0) {
+      alert(`Imported ${addedCount} new space(s) and updated ${updatedCount} existing space(s) from Arc Browser!`);
+    } else if (addedCount > 0) {
+      alert(`Successfully imported ${addedCount} space(s) from Arc Browser!`);
+    } else {
+      alert(`Updated ${updatedCount} existing space(s) from Arc Browser!`);
+    }
   } catch (err) {
     console.error('Error parsing Arc JSON:', err);
     alert('Error parsing the file. Make sure you selected a valid Arc StorableSidebar.json file.');
