@@ -349,6 +349,7 @@ export function parseArcJson(jsonString) {
           title: spaceTitle,
           items: spaceItems,
           color: spaceColor,
+          arcId: spaceEntry.id || null, // Preserve Arc's space ID for deduplication
         });
       }
     }
@@ -414,6 +415,7 @@ function buildArcNode(item, itemMap) {
       // Prefer custom title (item.title) over page title (savedTitle)
       name: item.title || item.data.tab.savedTitle || 'Untitled',
       url: item.data.tab.savedURL,
+      arcId: item.id || null, // Preserve Arc's item ID for deduplication
     };
   }
 
@@ -437,8 +439,9 @@ function buildArcNode(item, itemMap) {
       id: generateId(),
       type: 'folder',
       name: item.title || 'Folder',
-      expanded: true,
+      expanded: false, // Default to collapsed on import
       children,
+      arcId: item.id || null, // Preserve Arc's item ID for deduplication
     };
   }
 
@@ -456,6 +459,86 @@ export function createBoxesFromArcSpaces(spaces) {
       // Use Arc's original color if available, otherwise fall back to our palette
       color: space.color || COLORS[index % COLORS.length],
       items: space.items,
+      arcId: space.arcId || null, // Preserve Arc's space ID for deduplication
     };
   });
+}
+
+/**
+ * Merge imported Arc spaces with existing boxes, avoiding duplicates
+ */
+export function mergeArcSpaces(existingBoxes, newBoxes) {
+  const result = [...existingBoxes];
+  const existingArcIds = new Set();
+
+  // Collect all existing Arc IDs
+  for (const box of existingBoxes) {
+    if (box.arcId) existingArcIds.add(box.arcId);
+  }
+
+  for (const newBox of newBoxes) {
+    if (newBox.arcId && existingArcIds.has(newBox.arcId)) {
+      // Update existing box with same Arc ID
+      const existingIndex = result.findIndex(b => b.arcId === newBox.arcId);
+      if (existingIndex !== -1) {
+        // Preserve our internal ID and chromeId, update everything else
+        result[existingIndex] = {
+          ...newBox,
+          id: result[existingIndex].id,
+          chromeId: result[existingIndex].chromeId,
+        };
+        // Merge items recursively
+        result[existingIndex].items = mergeArcItems(
+          result[existingIndex].items || [],
+          newBox.items || []
+        );
+      }
+    } else {
+      // New space, add it
+      result.push(newBox);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Merge Arc items recursively, avoiding duplicates
+ */
+function mergeArcItems(existingItems, newItems) {
+  const result = [...existingItems];
+  const existingArcIds = new Map();
+
+  // Map existing items by Arc ID
+  for (let i = 0; i < existingItems.length; i++) {
+    if (existingItems[i].arcId) {
+      existingArcIds.set(existingItems[i].arcId, i);
+    }
+  }
+
+  for (const newItem of newItems) {
+    if (newItem.arcId && existingArcIds.has(newItem.arcId)) {
+      // Update existing item
+      const existingIndex = existingArcIds.get(newItem.arcId);
+      const existing = result[existingIndex];
+      result[existingIndex] = {
+        ...newItem,
+        id: existing.id,
+        chromeId: existing.chromeId,
+        expanded: existing.expanded, // Preserve expand state
+      };
+      // Recursively merge children for folders
+      if (newItem.type === 'folder' && newItem.children) {
+        result[existingIndex].children = mergeArcItems(
+          existing.children || [],
+          newItem.children
+        );
+      }
+    } else {
+      // New item, add it
+      result.push(newItem);
+    }
+  }
+
+  return result;
 }
