@@ -45,7 +45,7 @@ export const COLORS = [
  * Default box dimensions
  */
 export const DEFAULT_BOX = {
-  width: 280,
+  width: 350,
   height: 350,
   color: COLORS[0],
 };
@@ -224,8 +224,8 @@ export function createBoxFromBookmarks(items, title = 'Imported Bookmarks', x = 
     title,
     x,
     y,
-    width: 320,
-    height: 450,
+    width: 350,
+    height: 400,
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
     collapsed: false,
     items,
@@ -246,20 +246,81 @@ export function parseArcJson(jsonString) {
     return [];
   }
 
+  // Build a master item map from all sources
+  // Items in syncData.items have the container items with proper ordering (childrenIds)
+  // Items in sidebar.containers[x].items have the actual bookmark/folder data
+  // Multiple versions of items may exist - always keep the newest based on lastChangeDate
+  const masterItemMap = new Map();
+  const itemChangeDates = new Map(); // Track lastChangeDate for each item
+
+  // Helper to add item only if it's newer than existing
+  const addItemIfNewer = (id, item, lastChangeDate) => {
+    const existingDate = itemChangeDates.get(id) || 0;
+    if (lastChangeDate > existingDate) {
+      masterItemMap.set(id, item);
+      itemChangeDates.set(id, lastChangeDate);
+    }
+  };
+
+  // First, add items from firebaseSyncState.syncData.items (has container items with ordering)
+  // These items have a "value" wrapper and lastChangeDate
+  if (data.firebaseSyncState?.syncData?.items) {
+    for (const entry of data.firebaseSyncState.syncData.items) {
+      if (typeof entry === 'object' && entry !== null && entry.value && entry.value.id) {
+        const lastChangeDate = entry.lastChangeDate || 0;
+        addItemIfNewer(entry.value.id, entry.value, lastChangeDate);
+      }
+    }
+  }
+
+  // Also check sidebar.items (another source with "value" wrapper and lastChangeDate)
+  if (sidebar.items) {
+    for (const entry of sidebar.items) {
+      if (typeof entry === 'object' && entry !== null && entry.value && entry.value.id) {
+        const lastChangeDate = entry.lastChangeDate || 0;
+        addItemIfNewer(entry.value.id, entry.value, lastChangeDate);
+      }
+    }
+  }
+
   // Find containers - look for ones with items
   for (const container of sidebar.containers) {
     if (!container.spaces || !container.items) continue;
 
+    // Add items from this container (these don't have "value" wrapper)
+    // These represent the current state so use a high lastChangeDate
+    for (const entry of container.items) {
+      if (typeof entry === 'object' && entry !== null && entry.id) {
+        // sidebar.containers items don't have lastChangeDate, treat as current
+        addItemIfNewer(entry.id, entry, Number.MAX_SAFE_INTEGER);
+      }
+    }
+
     // Process each space in this container
+    // Arc's spaces array alternates between ID strings and space objects
     for (let i = 0; i < container.spaces.length; i++) {
-      const spaceData = container.spaces[i];
-      const spaceTitle = spaceData.title || `Space ${i + 1}`;
+      const spaceEntry = container.spaces[i];
+
+      // Skip string IDs, only process objects with space data
+      if (typeof spaceEntry === 'string') continue;
+
+      const spaceTitle = spaceEntry.title || `Space ${i + 1}`;
 
       // Get the container IDs for this space (pinned and unpinned)
-      const containerIds = spaceData.containerIDs || [];
+      // Arc uses newContainerIDs which also alternates between type objects and IDs
+      let containerIds = spaceEntry.containerIDs || [];
 
-      // Build items tree for this space
-      const spaceItems = buildArcItemTree(container.items, containerIds);
+      // Also check newContainerIDs format
+      if (spaceEntry.newContainerIDs) {
+        for (const entry of spaceEntry.newContainerIDs) {
+          if (typeof entry === 'string') {
+            containerIds.push(entry);
+          }
+        }
+      }
+
+      // Build items tree for this space using the master item map
+      const spaceItems = buildArcItemTree(masterItemMap, containerIds);
 
       if (spaceItems.length > 0) {
         spaces.push({
@@ -274,29 +335,43 @@ export function parseArcJson(jsonString) {
 }
 
 /**
- * Build a tree structure from Arc's flat items array
+ * Build a tree structure from Arc's item map
  */
-function buildArcItemTree(items, containerIds) {
-  // Filter items that belong to this space's containers
-  const relevantItems = items.filter(item => {
-    return containerIds.includes(item.parentID) ||
-           items.some(other => containerIds.includes(other.parentID) && isDescendant(items, item.id, other.id));
-  });
-
-  // Also include items whose parent is in the relevant set
-  const relevantIds = new Set(relevantItems.map(i => i.id));
-  const allRelevant = items.filter(item => {
-    return containerIds.includes(item.parentID) || relevantIds.has(item.parentID) || isAncestorRelevant(items, item, containerIds, relevantIds);
-  });
-
-  // Build the tree starting from container roots
+function buildArcItemTree(itemMap, containerIds) {
+  // Find root items by looking at container items' childrenIds for proper ordering
+  // Containers themselves are stored as items with data.itemContainer
   const result = [];
+  const processedIds = new Set();
 
-  for (const item of allRelevant) {
-    if (containerIds.includes(item.parentID)) {
-      const node = buildArcNode(item, allRelevant);
-      if (node) {
-        result.push(node);
+  // First, try to find container items and use their childrenIds for ordering
+  for (const containerId of containerIds) {
+    const containerItem = itemMap.get(containerId);
+    if (containerItem && containerItem.childrenIds && containerItem.childrenIds.length > 0) {
+      // Use the container's childrenIds for proper ordering
+      for (const childId of containerItem.childrenIds) {
+        if (!processedIds.has(childId)) {
+          const childItem = itemMap.get(childId);
+          if (childItem) {
+            const node = buildArcNode(childItem, itemMap);
+            if (node) {
+              result.push(node);
+              processedIds.add(childId);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: if no items found via containers, collect items by parentID
+  if (result.length === 0) {
+    for (const [id, item] of itemMap) {
+      if (containerIds.includes(item.parentID) && !processedIds.has(id)) {
+        const node = buildArcNode(item, itemMap);
+        if (node) {
+          result.push(node);
+          processedIds.add(id);
+        }
       }
     }
   }
@@ -305,53 +380,40 @@ function buildArcItemTree(items, containerIds) {
 }
 
 /**
- * Check if item is a descendant of potential ancestor
- */
-function isDescendant(items, itemId, ancestorId) {
-  const item = items.find(i => i.id === itemId);
-  if (!item) return false;
-  if (item.parentID === ancestorId) return true;
-  if (!item.parentID) return false;
-  return isDescendant(items, item.parentID, ancestorId);
-}
-
-/**
- * Check if any ancestor is relevant
- */
-function isAncestorRelevant(items, item, containerIds, relevantIds) {
-  if (!item.parentID) return false;
-  if (containerIds.includes(item.parentID)) return true;
-  if (relevantIds.has(item.parentID)) return true;
-  const parent = items.find(i => i.id === item.parentID);
-  if (!parent) return false;
-  return isAncestorRelevant(items, parent, containerIds, relevantIds);
-}
-
-/**
  * Build a single node from an Arc item
  */
-function buildArcNode(item, allItems) {
+function buildArcNode(item, itemMap) {
   // Check if it's a bookmark (has tab data with URL)
   if (item.data?.tab?.savedURL) {
     return {
       id: generateId(),
       type: 'bookmark',
-      name: item.data.tab.savedTitle || item.title || 'Untitled',
+      // Prefer custom title (item.title) over page title (savedTitle)
+      name: item.title || item.data.tab.savedTitle || 'Untitled',
       url: item.data.tab.savedURL,
     };
   }
 
-  // Check if it's a folder (has title, no tab data)
-  if (item.title && !item.data?.tab) {
-    const children = allItems
-      .filter(child => child.parentID === item.id)
-      .map(child => buildArcNode(child, allItems))
-      .filter(Boolean);
+  // Check if it's a folder (has title or childrenIds, no tab data)
+  if ((item.title || item.childrenIds?.length) && !item.data?.tab) {
+    // Use childrenIds array for proper ordering
+    const children = [];
+    if (item.childrenIds && item.childrenIds.length > 0) {
+      for (const childId of item.childrenIds) {
+        const childItem = itemMap.get(childId);
+        if (childItem) {
+          const childNode = buildArcNode(childItem, itemMap);
+          if (childNode) {
+            children.push(childNode);
+          }
+        }
+      }
+    }
 
     return {
       id: generateId(),
       type: 'folder',
-      name: item.title,
+      name: item.title || 'Folder',
       expanded: true,
       children,
     };
@@ -365,16 +427,16 @@ function buildArcNode(item, allItems) {
  */
 export function createBoxesFromArcSpaces(spaces, startX = 50, startY = 50) {
   return spaces.map((space, index) => {
-    const x = startX + (index % 3) * 340;
-    const y = startY + Math.floor(index / 3) * 400;
+    const x = startX + (index % 3) * 370;
+    const y = startY + Math.floor(index / 3) * 420;
 
     return {
       id: generateId(),
       title: space.title,
       x,
       y,
-      width: 320,
-      height: 450,
+      width: 350,
+      height: 400,
       color: COLORS[index % COLORS.length],
       collapsed: false,
       items: space.items,
