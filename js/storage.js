@@ -7,10 +7,42 @@ const STORAGE_KEY = 'arcLikeNewTab';
  */
 const DEFAULT_DATA = {
   boxes: [],
+  expandedSpaceId: null,
   settings: {
     theme: 'system',
   },
 };
+
+/**
+ * Migrate data to remove deprecated position/size properties
+ */
+function migrateData(data) {
+  if (!data.boxes) return { data, needsSave: false };
+
+  let needsSave = false;
+
+  // Remove x, y, width, height from boxes (no longer used in accordion layout)
+  data.boxes = data.boxes.map((box) => {
+    if ('x' in box || 'y' in box || 'width' in box || 'height' in box) {
+      needsSave = true;
+      const { x, y, width, height, ...rest } = box;
+      return rest;
+    }
+    return box;
+  });
+
+  // Also remove collapsed property (accordion uses expandedSpaceId instead)
+  data.boxes = data.boxes.map((box) => {
+    if ('collapsed' in box) {
+      needsSave = true;
+      const { collapsed, ...rest } = box;
+      return rest;
+    }
+    return box;
+  });
+
+  return { data, needsSave };
+}
 
 /**
  * Load data from storage
@@ -18,13 +50,23 @@ const DEFAULT_DATA = {
 export async function loadData() {
   return new Promise((resolve) => {
     if (typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.local.get(STORAGE_KEY, (result) => {
-        resolve(result[STORAGE_KEY] || DEFAULT_DATA);
+      chrome.storage.local.get(STORAGE_KEY, async (result) => {
+        let data = result[STORAGE_KEY] || DEFAULT_DATA;
+        const { data: migratedData, needsSave } = migrateData(data);
+        if (needsSave) {
+          await saveData(migratedData);
+        }
+        resolve(migratedData);
       });
     } else {
       // Fallback to localStorage for development
-      const data = localStorage.getItem(STORAGE_KEY);
-      resolve(data ? JSON.parse(data) : DEFAULT_DATA);
+      const stored = localStorage.getItem(STORAGE_KEY);
+      let data = stored ? JSON.parse(stored) : DEFAULT_DATA;
+      const { data: migratedData, needsSave } = migrateData(data);
+      if (needsSave) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migratedData));
+      }
+      resolve(migratedData);
     }
   });
 }
@@ -50,6 +92,25 @@ export async function saveData(data) {
 export async function saveBoxes(boxes) {
   const data = await loadData();
   data.boxes = boxes;
+  await saveData(data);
+}
+
+/**
+ * Save boxes and expanded space ID together
+ */
+export async function saveState(boxes, expandedSpaceId) {
+  const data = await loadData();
+  data.boxes = boxes;
+  data.expandedSpaceId = expandedSpaceId;
+  await saveData(data);
+}
+
+/**
+ * Save just the expanded space ID
+ */
+export async function saveExpandedSpaceId(expandedSpaceId) {
+  const data = await loadData();
+  data.expandedSpaceId = expandedSpaceId;
   await saveData(data);
 }
 
