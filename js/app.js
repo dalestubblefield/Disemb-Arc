@@ -14,7 +14,18 @@ import {
   createBoxFromBookmarks,
   parseArcJson,
   createBoxesFromArcSpaces,
+  generateId,
 } from './utils.js';
+import {
+  initSync,
+  syncAllSpacesToChrome,
+  syncSpaceToChrome,
+  removeSpaceFromChrome,
+  removeItemFromChrome,
+  findItemByChromeId,
+  findParentSpace,
+  removeItemByChromeId,
+} from './sync.js';
 
 // Application state
 let boxes = [];
@@ -37,6 +48,15 @@ async function init() {
   const data = await loadData();
   boxes = data.boxes || [];
   expandedSpaceId = data.expandedSpaceId || (boxes.length > 0 ? boxes[0].id : null);
+
+  // Initialize Chrome bookmarks sync
+  initSync(handleChromeBookmarkChange);
+
+  // Sync existing spaces to Chrome bookmarks
+  if (boxes.length > 0) {
+    boxes = await syncAllSpacesToChrome(boxes);
+    saveBoxes(boxes);
+  }
 
   // Render initial state
   render();
@@ -222,9 +242,91 @@ function handleKeyDown(e) {
 }
 
 /**
- * Save boxes to storage (debounced)
+ * Handle changes from Chrome bookmarks (two-way sync)
  */
-const save = debounce(() => {
+async function handleChromeBookmarkChange(eventType, data) {
+  const { id, bookmark, changeInfo, removeInfo, moveInfo } = data;
+
+  switch (eventType) {
+    case 'created': {
+      // A bookmark was created in Chrome - add it to our data if it's in a synced folder
+      const parentSpace = findParentSpace(boxes, bookmark.parentId);
+      if (parentSpace) {
+        // Find the parent item (folder) in our structure
+        const parentResult = findItemByChromeId(boxes, bookmark.parentId);
+        const newItem = bookmark.url
+          ? { id: generateId(), type: 'bookmark', name: bookmark.title, url: bookmark.url, chromeId: id }
+          : { id: generateId(), type: 'folder', name: bookmark.title, expanded: true, children: [], chromeId: id };
+
+        if (parentResult && parentResult.type === 'folder') {
+          parentResult.item.children = parentResult.item.children || [];
+          parentResult.item.children.push(newItem);
+        } else if (parentResult && parentResult.type === 'space') {
+          parentResult.item.items.push(newItem);
+        }
+        saveBoxes(boxes);
+        render();
+      }
+      break;
+    }
+
+    case 'removed': {
+      // A bookmark was removed in Chrome - remove from our data
+      const result = findItemByChromeId(boxes, id);
+      if (result) {
+        if (result.type === 'space') {
+          // A space folder was removed
+          const boxToRemove = result.item;
+          boxes = boxes.filter((b) => b.id !== boxToRemove.id);
+          if (expandedSpaceId === boxToRemove.id) {
+            expandedSpaceId = boxes.length > 0 ? boxes[0].id : null;
+            saveExpandedSpaceId(expandedSpaceId);
+          }
+        } else {
+          // An item was removed - find its parent and remove it
+          for (const box of boxes) {
+            if (removeItemByChromeId(box.items, id)) break;
+          }
+        }
+        saveBoxes(boxes);
+        render();
+      }
+      break;
+    }
+
+    case 'changed': {
+      // A bookmark was changed in Chrome - update our data
+      const result = findItemByChromeId(boxes, id);
+      if (result) {
+        if (result.type === 'space') {
+          result.item.title = changeInfo.title || result.item.title;
+        } else {
+          result.item.name = changeInfo.title || result.item.name;
+          if (changeInfo.url && result.item.type === 'bookmark') {
+            result.item.url = changeInfo.url;
+          }
+        }
+        saveBoxes(boxes);
+        render();
+      }
+      break;
+    }
+
+    case 'moved': {
+      // A bookmark was moved in Chrome - update our structure
+      // This is complex - for now, just re-sync
+      // TODO: Implement proper move handling
+      break;
+    }
+  }
+}
+
+/**
+ * Save boxes to storage and sync to Chrome (debounced)
+ */
+const save = debounce(async () => {
+  // Sync all spaces to Chrome
+  boxes = await syncAllSpacesToChrome(boxes);
   saveBoxes(boxes);
 }, 300);
 
@@ -296,14 +398,19 @@ const handlers = {
     }
   },
 
-  onDelete(boxId) {
+  async onDelete(boxId) {
+    const box = findBox(boxId);
+    if (box) {
+      // Remove from Chrome bookmarks
+      await removeSpaceFromChrome(box);
+    }
     boxes = boxes.filter((b) => b.id !== boxId);
     // If the deleted box was expanded, expand the first remaining box
     if (expandedSpaceId === boxId) {
       expandedSpaceId = boxes.length > 0 ? boxes[0].id : null;
       saveExpandedSpaceId(expandedSpaceId);
     }
-    save();
+    saveBoxes(boxes);
     render();
   },
 
@@ -380,9 +487,14 @@ const handlers = {
     }
   },
 
-  onDeleteItem(boxId, itemId) {
+  async onDeleteItem(boxId, itemId) {
     const box = findBox(boxId);
     if (box) {
+      const item = findItemById(box.items, itemId);
+      if (item) {
+        // Remove from Chrome bookmarks
+        await removeItemFromChrome(item);
+      }
       removeItemById(box.items, itemId);
       save();
       render();
