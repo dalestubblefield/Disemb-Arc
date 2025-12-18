@@ -42,27 +42,13 @@ export const COLORS = [
 ];
 
 /**
- * Default box dimensions
+ * Create a new empty box (space)
  */
-export const DEFAULT_BOX = {
-  width: 350,
-  height: 350,
-  color: COLORS[0],
-};
-
-/**
- * Create a new empty box
- */
-export function createEmptyBox(x = 100, y = 100) {
+export function createEmptyBox() {
   return {
     id: generateId(),
-    title: 'New Box',
-    x,
-    y,
-    width: DEFAULT_BOX.width,
-    height: DEFAULT_BOX.height,
+    title: 'New Space',
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
-    collapsed: false,
     items: [],
   };
 }
@@ -218,23 +204,56 @@ function parseDlElement(dl) {
 /**
  * Create a box from imported bookmarks
  */
-export function createBoxFromBookmarks(items, title = 'Imported Bookmarks', x = 100, y = 100) {
+export function createBoxFromBookmarks(items, title = 'Imported Bookmarks') {
   return {
     id: generateId(),
     title,
-    x,
-    y,
-    width: 350,
-    height: 400,
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
-    collapsed: false,
     items,
   };
 }
 
 /**
+ * Convert RGB values (0-1 range) to hex color
+ */
+function rgbToHex(r, g, b) {
+  // Clamp values to 0-1 range (Arc uses extendedSRGB which can have values outside 0-1)
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  const toHex = (v) => Math.round(clamp(v) * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/**
+ * Extract color from Arc's space customInfo
+ */
+function extractArcSpaceColor(spaceEntry) {
+  const customInfo = spaceEntry?.customInfo;
+  if (!customInfo) return null;
+
+  // Try primaryColorPalette.midTone first (cleaner path)
+  const midTone = customInfo?.windowTheme?.primaryColorPalette?.midTone;
+  if (midTone && typeof midTone.red === 'number') {
+    return rgbToHex(midTone.red, midTone.green, midTone.blue);
+  }
+
+  // Try background.single color path
+  const bgColor = customInfo?.windowTheme?.background?.single?._0?.style?.color?._0?.blendedSingleColor?._0?.color;
+  if (bgColor && typeof bgColor.red === 'number') {
+    return rgbToHex(bgColor.red, bgColor.green, bgColor.blue);
+  }
+
+  // Try semanticColorPalette focus color
+  const focusColor = customInfo?.windowTheme?.semanticColorPalette?.appearanceBased?.light?.focus;
+  if (focusColor && typeof focusColor.red === 'number') {
+    return rgbToHex(focusColor.red, focusColor.green, focusColor.blue);
+  }
+
+  return null;
+}
+
+/**
  * Parse Arc Browser's StorableSidebar.json format
- * Returns an array of spaces, each with { title, items }
+ * Returns an array of spaces, each with { title, items, color }
  */
 export function parseArcJson(jsonString) {
   const data = JSON.parse(jsonString);
@@ -306,6 +325,9 @@ export function parseArcJson(jsonString) {
 
       const spaceTitle = spaceEntry.title || `Space ${i + 1}`;
 
+      // Extract color from Arc's space data (RGB values)
+      const spaceColor = extractArcSpaceColor(spaceEntry);
+
       // Get the container IDs for this space (pinned and unpinned)
       // Arc uses newContainerIDs which also alternates between type objects and IDs
       let containerIds = spaceEntry.containerIDs || [];
@@ -326,6 +348,7 @@ export function parseArcJson(jsonString) {
         spaces.push({
           title: spaceTitle,
           items: spaceItems,
+          color: spaceColor,
         });
       }
     }
@@ -425,20 +448,13 @@ function buildArcNode(item, itemMap) {
 /**
  * Create boxes from Arc spaces
  */
-export function createBoxesFromArcSpaces(spaces, startX = 50, startY = 50) {
+export function createBoxesFromArcSpaces(spaces) {
   return spaces.map((space, index) => {
-    const x = startX + (index % 3) * 370;
-    const y = startY + Math.floor(index / 3) * 420;
-
     return {
       id: generateId(),
       title: space.title,
-      x,
-      y,
-      width: 350,
-      height: 400,
-      color: COLORS[index % COLORS.length],
-      collapsed: false,
+      // Use Arc's original color if available, otherwise fall back to our palette
+      color: space.color || COLORS[index % COLORS.length],
       items: space.items,
     };
   });
