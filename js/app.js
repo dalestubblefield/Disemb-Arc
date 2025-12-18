@@ -532,7 +532,59 @@ const handlers = {
     save();
     render();
   },
+
+  onReorderItem(sourceBoxId, itemId, targetBoxId, targetItemId, position) {
+    const sourceBox = findBox(sourceBoxId);
+    const targetBox = findBox(targetBoxId);
+
+    if (!sourceBox || !targetBox) return;
+
+    // Find the item to move
+    const item = findItemById(sourceBox.items, itemId);
+    if (!item) return;
+
+    // Find the target item and its parent
+    const targetItem = findItemById(targetBox.items, targetItemId);
+    if (!targetItem) return;
+
+    // Find parent array of target item
+    const targetParent = findParentById(targetBox.items, targetItemId);
+    const targetArray = targetParent ? targetParent.children : targetBox.items;
+
+    // Don't allow moving a folder into itself
+    if (item.type === 'folder' && isDescendant(item, targetItemId)) return;
+
+    // Remove from source
+    removeItemById(sourceBox.items, itemId);
+
+    // Find index of target item in its parent array
+    let targetIndex = targetArray.findIndex((i) => i.id === targetItemId);
+    if (targetIndex === -1) return;
+
+    // Adjust index based on position
+    if (position === 'after') {
+      targetIndex += 1;
+    }
+
+    // Insert at the correct position
+    targetArray.splice(targetIndex, 0, item);
+
+    save();
+    render();
+  },
 };
+
+/**
+ * Check if targetId is a descendant of item
+ */
+function isDescendant(item, targetId) {
+  if (!item.children) return false;
+  for (const child of item.children) {
+    if (child.id === targetId) return true;
+    if (isDescendant(child, targetId)) return true;
+  }
+  return false;
+}
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', init);
